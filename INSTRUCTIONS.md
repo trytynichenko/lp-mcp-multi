@@ -81,6 +81,22 @@ To list all accounts: call `account_list`
 }
 ```
 
+**OAuth 1.0 accounts** — fill in all four key fields (`appKey`, `secret`, `accessToken`, `accessTokenSecret`).
+
+**OAuth 2.0 accounts** — set `appKey` to the client ID, `secret` to the client secret, and use `"hint"` for both `accessToken` and `accessTokenSecret`:
+```json
+{
+  "24831960": {
+    "name": "My Account",
+    "login": "bot_login_name",
+    "appKey": "<client_id>",
+    "secret": "<client_secret>",
+    "accessToken": "hint",
+    "accessTokenSecret": "hint"
+  }
+}
+```
+
 ### Adding a New Account
 The user must:
 1. Create a bot user in LP Conversational Cloud (Users → Add → Bot type → Administrator profile)
