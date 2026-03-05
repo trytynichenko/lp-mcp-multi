@@ -29,6 +29,7 @@ import * as accountTools from './tools/account.js';
 import * as faasTools from './tools/faas.js';
 import * as summaryTools from './tools/summary.js';
 import * as changelogTools from './tools/changelog.js';
+import * as campaignTraceTools from './tools/campaign-trace.js';
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ const ctx = { accountManager, auth, lpChild, state };
 
 // ─── Register custom tools ──────────────────────────────────────────────────
 
-const toolModules = [accountTools, faasTools, summaryTools, changelogTools];
+const toolModules = [accountTools, faasTools, summaryTools, changelogTools, campaignTraceTools];
 
 // Collect tool definitions
 const customToolDefs = toolModules.flatMap(m => m.tools);
@@ -66,9 +67,28 @@ const server = new Server(
   { capabilities: { tools: {} } },
 );
 
-// tools/list — our custom tools + proxied LP tools
+// tools/list — our custom tools + proxied LP tools (with schema patches)
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools: [...customToolDefs, ...lpChild.tools] };
+  const lpTools = lpChild.tools.map(t => {
+    // R3: Add compact param to conv_manage
+    if (t.name === 'conv_manage' && t.inputSchema?.properties) {
+      return {
+        ...t,
+        inputSchema: {
+          ...t.inputSchema,
+          properties: {
+            ...t.inputSchema.properties,
+            compact: {
+              type: 'boolean',
+              description: 'search: return compact results (strip message records, keep conversation info only)',
+            },
+          },
+        },
+      };
+    }
+    return t;
+  });
+  return { tools: [...customToolDefs, ...lpTools] };
 });
 
 // tools/call — route to custom handler or LP child
@@ -90,8 +110,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: 'text', text: 'No account connected. Use account_switch first.' }], isError: true };
   }
 
+  // Strip proxy-only params before forwarding to LP child
+  const lpArgs = { ...args };
+  const compact = lpArgs.compact;
+  delete lpArgs.compact;
+
   try {
-    return await lpChild.callTool(toolName, args);
+    const result = await lpChild.callTool(toolName, lpArgs);
+    return postProcess(toolName, lpArgs, result, { compact });
   } catch (err) {
     // Auto-reconnect on child death
     if (state.accountId && (err.message?.includes('closed') || err.message?.includes('not connected'))) {
@@ -99,7 +125,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         log(`Reconnecting to ${state.accountId}...`);
         const account = accountManager.resolve(state.accountId);
         await lpChild.spawn(account);
-        return await lpChild.callTool(toolName, args);
+        const result = await lpChild.callTool(toolName, lpArgs);
+        return postProcess(toolName, lpArgs, result, { compact });
       } catch (retryErr) {
         return { content: [{ type: 'text', text: `Failed after reconnect: ${retryErr.message}` }], isError: true };
       }
@@ -107,6 +134,73 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: 'text', text: `Tool call failed: ${err.message}` }], isError: true };
   }
 });
+
+// ─── Response post-processing (R3: compact conv, R4: engagement enrichment) ──
+
+function postProcess(toolName, args, result, opts) {
+  try {
+    const txt = result?.content?.[0]?.text;
+    if (!txt) return result;
+
+    // R3: Compact mode for conv_manage search
+    if (toolName === 'conv_manage' && args.action === 'search' && opts.compact) {
+      const data = JSON.parse(txt);
+      const records = data.conversationHistoryRecords || [];
+      const conversations = records.map(r => {
+        const i = r.info || {};
+        const cp = r.consumerParticipants?.[0] || {};
+        return {
+          conversationId: i.conversationId,
+          source: i.source,
+          startTime: i.startTime,
+          endTime: i.endTime,
+          duration: i.duration,
+          status: i.status,
+          latestSkillId: i.latestSkillId,
+          latestSkillName: i.latestSkillName,
+          latestAgentFullName: i.latestAgentFullName,
+          latestAgentGroupName: i.latestAgentGroupName,
+          closeReason: i.closeReasonDescription,
+          mcs: i.mcs,
+          firstConversation: i.firstConversation,
+          consumerName: cp.firstName ? `${cp.firstName} ${cp.lastName || ''}`.trim() : undefined,
+          campaign: r.campaign,
+        };
+      });
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ count: data._metadata?.count || conversations.length, conversations }, null, 2),
+        }],
+      };
+    }
+
+    // R4: Enrich ac_engagements get with extracted phones/URLs from HTML
+    if (toolName === 'ac_engagements' && args.action === 'get') {
+      const eng = JSON.parse(txt);
+      if (eng?.displayInstances) {
+        const phones = new Set();
+        const urls = new Set();
+        for (const di of eng.displayInstances) {
+          const html = di.presentation?.html || '';
+          for (const m of html.matchAll(/whatsapp\.com\/send\/?\?phone=(\d+)/gi)) phones.add(`+${m[1]}`);
+          for (const m of html.matchAll(/tel:([+\d-]+)/gi)) phones.add(m[1]);
+          for (const m of html.matchAll(/href="(https?:\/\/[^"]+)"/gi)) {
+            const u = m[1].replace(/&amp;/g, '&');
+            if (!/liveperson|lpsnmedia|lpcdn/.test(u)) urls.add(u);
+          }
+        }
+        if (phones.size) eng._extractedPhones = [...phones];
+        if (urls.size) eng._extractedUrls = [...urls];
+        return { content: [{ type: 'text', text: JSON.stringify(eng, null, 2) }] };
+      }
+    }
+
+    return result;
+  } catch {
+    return result;
+  }
+}
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 

@@ -170,7 +170,7 @@ The user must:
 ## Capabilities
 
 ### Account Summary (Read-Only)
-- `account_summary`: Single-call snapshot — skills, LOBs, users, bots, flows, KBs, campaigns, apps, FaaS, conversations. Use `sections` param to limit scope.
+- `account_summary`: Single-call snapshot — skills, LOBs, users, bots, flows, KBs, campaigns, channels (messaging connectors: WhatsApp, SMS, Facebook, etc.), apps, FaaS, conversations. Use `sections` param to limit scope.
 
 ### Account Audit (Read-Only)
 Gather comprehensive account data:
@@ -204,11 +204,12 @@ Gather comprehensive account data:
 
 ### Campaign & Engagement Management
 - `ac_campaigns: list_summary` / `get`: Campaign details
-- `ac_engagements: list` / `get`: Engagement config
+- `ac_engagements: list` / `get`: Engagement config (get auto-extracts phone numbers and URLs from HTML as `_extractedPhones` / `_extractedUrls`)
+- `composite_campaign_trace`: Trace the full routing chain for a channel, skill, or campaign — returns connector → campaign → engagement (with phones/URLs) → entry point (with URL patterns) → skill. Use `channel` (whatsapp, sms, facebook, etc.), `skill`, or `campaignId` as filter.
 - `composite_cleanup_campaigns`: Find stale campaigns (dry-run is read-only, delete needs confirmation)
 
 ### Conversation Management
-- `conv_manage: search`: Find conversations (default: OPEN, last 24h)
+- `conv_manage: search`: Find conversations (default: OPEN, last 24h). Add `compact: true` for lightweight results (strips message records, keeps conversation info only — source, skill, status, duration, MCS, campaign).
 - `conv_manage: get_transcript`: Read conversation history
 - Close/transfer/message: WRITE — needs confirmation
 

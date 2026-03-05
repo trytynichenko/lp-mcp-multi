@@ -21,7 +21,7 @@ export const tools = [
           type: 'string',
           description:
             'Optional comma-separated list of sections to include. ' +
-            'Available: skills, lobs, users, bots, flows, kb, campaigns, apps, faas, conversations. ' +
+            'Available: skills, lobs, users, bots, flows, kb, campaigns, channels, apps, faas, conversations. ' +
             'Default: all sections.',
         },
       },
@@ -127,6 +127,30 @@ export function register(ctx) {
           type: k.type || '',
           articleCount: k.articleCount ?? '',
         })),
+      };
+    },
+
+    channels: async () => {
+      const data = await call('ac_lookup', { resource: 'installations' });
+      if (!Array.isArray(data)) return { count: 0, error: 'unavailable' };
+      // Filter for messaging connectors (msg.consumer scope + webhook capabilities)
+      const messaging = data.filter(a =>
+        a.scope?.includes('msg.consumer') && a.capabilities?.webhooks && !a.deleted && a.enabled !== false
+      );
+      return {
+        count: messaging.length,
+        items: messaging.map(c => {
+          // Extract gateway host from first webhook URL
+          const hooks = c.capabilities?.webhooks || {};
+          const firstUrl = Object.values(hooks).find(h => h?.endpoint)?.endpoint || '';
+          const gateway = firstUrl.match(/https?:\/\/([^/]+)/)?.[1] || '';
+          return {
+            name: c.client_name,
+            clientId: c.client_id,
+            enabled: c.enabled,
+            ...(gateway && { gateway }),
+          };
+        }),
       };
     },
 
