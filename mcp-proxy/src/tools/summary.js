@@ -77,7 +77,7 @@ export function register(ctx) {
       if (!Array.isArray(data)) return { count: 0, error: 'unavailable' };
       const byType = {};
       for (const u of data) {
-        const type = u.userTypeId === '2' ? 'bot' : 'human';
+        const type = u.userTypeId == 2 ? 'bot' : 'human';
         byType[type] = (byType[type] || 0) + 1;
       }
       return { count: data.length, byType };

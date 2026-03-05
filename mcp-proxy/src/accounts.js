@@ -2,7 +2,7 @@
  * Account management — loads accounts.json, resolves names, manages artifacts dirs.
  */
 
-import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 export class AccountManager {
@@ -10,6 +10,7 @@ export class AccountManager {
     this.projectRoot = projectRoot;
     this.accountsFile = join(projectRoot, 'accounts.json');
     this.accountsDir = join(projectRoot, 'accounts');
+    this.lastAccountFile = join(projectRoot, '.last-account');
   }
 
   /** Load all accounts from accounts.json */
@@ -28,17 +29,26 @@ export class AccountManager {
     }));
   }
 
-  /** Resolve an input string (ID or name) to a full account config */
+  /** Resolve an input string (ID, name, or alias) to a full account config */
   resolve(input) {
     const accounts = this.loadAll();
+    const needle = input.toLowerCase().trim();
 
     // Exact ID match
     if (accounts[input]) {
       return { accountId: input, ...accounts[input] };
     }
 
-    // Case-insensitive match: all words in input must appear in the name
-    const words = input.toLowerCase().split(/\s+/);
+    // Alias match (exact, case-insensitive)
+    for (const [id, cfg] of Object.entries(accounts)) {
+      const aliases = (cfg.aliases || []).map(a => a.toLowerCase());
+      if (aliases.includes(needle)) {
+        return { accountId: id, ...cfg };
+      }
+    }
+
+    // Fuzzy name match: all words in input must appear in the name
+    const words = needle.split(/\s+/);
     const matches = Object.entries(accounts)
       .filter(([, cfg]) => {
         const name = cfg.name?.toLowerCase() || '';
@@ -57,6 +67,19 @@ export class AccountManager {
       .map(([id, cfg]) => `${id} (${cfg.name})`)
       .join(', ');
     throw new Error(`No account found matching '${input}'. Available: ${available}`);
+  }
+
+  /** Save the last-used account ID */
+  saveLastAccount(accountId) {
+    writeFileSync(this.lastAccountFile, accountId, 'utf-8');
+  }
+
+  /** Get the last-used account ID (or null) */
+  getLastAccount() {
+    if (!existsSync(this.lastAccountFile)) return null;
+    const id = readFileSync(this.lastAccountFile, 'utf-8').trim();
+    const accounts = this.loadAll();
+    return accounts[id] ? id : null;
   }
 
   /** Ensure an artifacts subdirectory exists, returns the path */

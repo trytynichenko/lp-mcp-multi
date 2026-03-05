@@ -28,6 +28,7 @@ import { LPChild } from './lp-child.js';
 import * as accountTools from './tools/account.js';
 import * as faasTools from './tools/faas.js';
 import * as summaryTools from './tools/summary.js';
+import * as changelogTools from './tools/changelog.js';
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ const ctx = { accountManager, auth, lpChild, state };
 
 // ─── Register custom tools ──────────────────────────────────────────────────
 
-const toolModules = [accountTools, faasTools, summaryTools];
+const toolModules = [accountTools, faasTools, summaryTools, changelogTools];
 
 // Collect tool definitions
 const customToolDefs = toolModules.flatMap(m => m.tools);
@@ -114,9 +115,9 @@ function log(msg) {
 }
 
 async function start() {
-  // Auto-connect to the first account
+  // Auto-connect to the last-used account (or first available)
   const accounts = accountManager.loadAll();
-  const firstId = Object.keys(accounts)[0];
+  const firstId = accountManager.getLastAccount() || Object.keys(accounts)[0];
   if (firstId) {
     try {
       const account = accountManager.resolve(firstId);

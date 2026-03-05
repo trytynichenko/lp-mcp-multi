@@ -70,24 +70,35 @@ export class LPAuth {
     delete this.cache[accountId];
   }
 
-  /** Helper: make an authenticated GET/POST to an LP API */
+  /** Helper: make an authenticated GET/POST to an LP API (auto-retries on 401) */
   async fetch(accountId, csdsDomain, path, { method = 'GET', body, additionalParams = '' } = {}) {
-    const auth = await this.getAuth(accountId);
-    const domain = auth.domains[csdsDomain];
-    if (!domain) throw new Error(`CSDS domain '${csdsDomain}' not available`);
+    const doRequest = async (auth) => {
+      const domain = auth.domains[csdsDomain];
+      if (!domain) throw new Error(`CSDS domain '${csdsDomain}' not available`);
 
-    const url = `https://${domain}/api/account/${accountId}${path}?userId=${auth.userId}&v=1${additionalParams}`;
-    const opts = {
-      method,
-      headers: {
-        'Authorization': `Bearer ${auth.bearer}`,
-        'Content-Type': 'application/json',
-        'user-agent': 'lp-mcp-proxy',
-      },
+      const url = `https://${domain}/api/account/${accountId}${path}?userId=${auth.userId}&v=1${additionalParams}`;
+      const opts = {
+        method,
+        headers: {
+          'Authorization': `Bearer ${auth.bearer}`,
+          'Content-Type': 'application/json',
+          'user-agent': 'lp-mcp-proxy',
+        },
+      };
+      if (body) opts.body = JSON.stringify(body);
+      return fetch(url, opts);
     };
-    if (body) opts.body = JSON.stringify(body);
 
-    const resp = await fetch(url, opts);
+    let auth = await this.getAuth(accountId);
+    let resp = await doRequest(auth);
+
+    // Retry once on 401 — token may have expired server-side before our TTL
+    if (resp.status === 401) {
+      this.invalidate(accountId);
+      auth = await this.getAuth(accountId);
+      resp = await doRequest(auth);
+    }
+
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
       throw new Error(`API ${method} ${path} → ${resp.status}: ${text || resp.statusText}`);

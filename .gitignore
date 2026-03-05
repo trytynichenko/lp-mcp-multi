@@ -1,6 +1,9 @@
 # Credentials — never commit
 accounts.json
 
+# Session state
+.last-account
+
 # Account artifacts — user-specific outputs
 accounts/*/artifacts/
 

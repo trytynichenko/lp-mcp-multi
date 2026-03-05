@@ -37,6 +37,7 @@ export function register(ctx) {
       state.accountId = account.accountId;
       state.accountName = account.name;
       state.accountLogin = account.login;
+      accountManager.saveLastAccount(account.accountId);
       return text(
         `Switched to account ${account.accountId} — ${account.name} (login: ${account.login})\n\n` +
         `Ready. ${lpChild.tools.length} LP tools available.`

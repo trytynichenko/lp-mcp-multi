@@ -7,22 +7,26 @@
  *   GET /lambdas/{uuid}    — get function by UUID (includes code)
  */
 
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 export const tools = [
   {
     name: 'faas_functions',
-    description: 'Manage LivePerson Functions (FaaS): list, get (with source code), or pull_all (export all to artifacts/faas/).',
+    description:
+      'Manage LivePerson Functions (FaaS): list, get (with source code), pull_all (export all to artifacts/faas/), ' +
+      'or diff (compare local export against live version).',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['list', 'get', 'pull_all'],
-          description: 'list: summary of all functions. get: full function with code. pull_all: export all to artifacts/faas/.',
+          enum: ['list', 'get', 'pull_all', 'diff'],
+          description:
+            'list: summary of all functions. get: full function with code. ' +
+            'pull_all: export all to artifacts/faas/. diff: compare local vs live (requires prior pull_all).',
         },
-        name: { type: 'string', description: 'get: function name (exact match)' },
+        name: { type: 'string', description: 'get/diff: function name (exact match)' },
         uuid: { type: 'string', description: 'get: function UUID (alternative to name)' },
         fields: { type: 'string', description: 'list: comma-separated fields (e.g. "name,state,eventId")' },
       },
@@ -119,6 +123,54 @@ export function register(ctx) {
             `Pulled ${pulled.length} functions to accounts/${state.accountId}/artifacts/faas/\n\n` +
             pulled.join('\n')
           );
+        }
+
+        case 'diff': {
+          if (!args.name) return error('Provide function name for diff');
+          const faasDir = join(accountManager.ensureArtifactsDir(state.accountId, 'faas'), args.name);
+          const localCodePath = join(faasDir, 'index.js');
+          const localConfigPath = join(faasDir, 'config.json');
+
+          if (!existsSync(localCodePath)) {
+            return error(`No local export found for "${args.name}". Run pull_all first.`);
+          }
+
+          // Fetch live version
+          const lambdas = await faasGet('/lambdas', `&name=${encodeURIComponent(args.name)}`);
+          if (!lambdas || lambdas.length === 0) return error('Function not found on account');
+          const live = lambdas[0];
+          const liveCode = live.implementation?.code || '';
+          const localCode = readFileSync(localCodePath, 'utf-8');
+
+          const diffs = [];
+
+          // Compare code
+          if (localCode.trim() !== liveCode.trim()) {
+            diffs.push('CODE: changed');
+          }
+
+          // Compare config fields
+          if (existsSync(localConfigPath)) {
+            const localConfig = JSON.parse(readFileSync(localConfigPath, 'utf-8'));
+            const liveEnvVars = JSON.stringify(live.implementation?.environmentVariables || []);
+            const localEnvVars = JSON.stringify(localConfig.environmentVariables || []);
+            if (liveEnvVars !== localEnvVars) diffs.push('ENV VARS: changed');
+            if ((live.state || '') !== (localConfig.state || '')) diffs.push(`STATE: ${localConfig.state} → ${live.state}`);
+            if ((live.description || '') !== (localConfig.description || '')) diffs.push('DESCRIPTION: changed');
+            const liveDeps = JSON.stringify(live.implementation?.dependencies || []);
+            const localDeps = JSON.stringify(localConfig.dependencies || []);
+            if (liveDeps !== localDeps) diffs.push('DEPENDENCIES: changed');
+
+            const liveModified = live.updatedAt ? new Date(live.updatedAt).toISOString() : '';
+            if (liveModified !== (localConfig.lastModified || '')) {
+              diffs.push(`LAST MODIFIED: ${localConfig.lastModified || 'unknown'} → ${liveModified} (by ${live.updatedBy || 'unknown'})`);
+            }
+          }
+
+          if (diffs.length === 0) {
+            return text(`${args.name}: no changes (local matches live)`);
+          }
+          return text(`${args.name}: ${diffs.length} difference(s)\n\n${diffs.join('\n')}`);
         }
 
         default:

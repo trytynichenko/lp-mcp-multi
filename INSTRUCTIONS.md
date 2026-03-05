@@ -34,13 +34,14 @@ lp-mcp-multi/
   mcp-proxy/            # Multi-account MCP proxy server
     src/
       index.js          # Entry point — loads tools, starts server
-      accounts.js       # Account loading and name resolution
-      auth.js           # LP login, bearer tokens, CSDS domains
-      lp-child.js       # LP MCP child process lifecycle
+      accounts.js       # Account loading, name/alias resolution, last-account persistence
+      auth.js           # LP login, bearer tokens, CSDS domains (auto-retry on 401)
+      lp-child.js       # LP MCP child process lifecycle (LP_TOOLS filtering)
       tools/
         account.js      # account_switch, account_list, account_current
-        faas.js         # faas_functions (list, get, pull_all)
+        faas.js         # faas_functions (list, get, pull_all, diff)
         summary.js      # account_summary (full account snapshot)
+        changelog.js    # changelog_log, changelog_view (local audit log)
     package.json
   accounts/
     <account_id>/
@@ -56,13 +57,14 @@ lp-mcp-multi/
 ```
 
 ### Switching Accounts
-The user can refer to accounts by **ID or name** (case-insensitive, multi-word matching).
+The user can refer to accounts by **ID**, **name** (case-insensitive, multi-word matching), or **alias**.
 When the user asks to work on a specific account:
-1. Call `account_switch` with the account ID or name — switching is instant, no restart needed
+1. Call `account_switch` with the account ID, name, or alias — switching is instant, no restart needed
 2. The proxy kills the old LP MCP child and spawns a new one with the new credentials
-3. Always announce: "Connected to account <id> (<name>)"
+3. The last-used account is remembered across sessions (stored in `.last-account`)
+4. Always announce: "Connected to account <id> (<name>)"
 
-Examples: "delta prod", "morgan", "si", "90862799" all work as input.
+Examples: "delta prod", "morgan", "mm", "si", "90862799" all work as input.
 
 To see the current account: call `account_current`
 To list all accounts: call `account_list`
@@ -76,7 +78,9 @@ To list all accounts: call `account_list`
     "appKey": "...",
     "secret": "...",
     "accessToken": "...",
-    "accessTokenSecret": "..."
+    "accessTokenSecret": "...",
+    "aliases": ["short", "alias"],
+    "tools": "core,cb,ai,kai"
   }
 }
 ```
@@ -96,6 +100,10 @@ To list all accounts: call `account_list`
   }
 }
 ```
+
+**Optional fields:**
+- `aliases` — array of short names for quick switching (e.g. `["mm", "morgan"]`). Matched case-insensitively.
+- `tools` — comma-separated LP tool groups to load for this account (e.g. `"core,cb,ai"`). Default: all groups. Groups: `core`, `extra`, `conv`, `kai`, `cb`, `ai`, `auth`, `demo`, `composite`, `web`.
 
 ### Adding a New Account
 The user must:
@@ -207,6 +215,18 @@ Gather comprehensive account data:
 ### Account Backup
 - `composite_backup_account`: Full config snapshot (read-only)
 - Save to `accounts/<account_id>/artifacts/backups/backup_<date>.json`
+
+### FaaS Management
+- `faas_functions: list`: Summary of all functions
+- `faas_functions: get`: Full function with source code
+- `faas_functions: pull_all`: Export all functions to `artifacts/faas/`
+- `faas_functions: diff`: Compare a local export against the live version (requires prior `pull_all`)
+
+### Changelog
+- `changelog_log`: Append an entry after any write operation (action + details)
+- `changelog_view`: View recent changelog entries (default last 20)
+- Changelog is saved to `accounts/<account_id>/artifacts/changelog.md`
+- After any confirmed write operation, call `changelog_log` to record it
 
 ### Demo Building (all WRITE — need confirmation)
 - `workflow_create_demo`: End-to-end demo

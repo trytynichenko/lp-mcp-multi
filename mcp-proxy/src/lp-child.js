@@ -29,6 +29,9 @@ export class LPChild {
       LP_ACCESS_TOKEN_SECRET: account.accessTokenSecret,
     };
 
+    // Pass LP_TOOLS filter if configured on the account
+    if (account.tools) env.LP_TOOLS = account.tools;
+
     this.transport = new StdioClientTransport({
       command: 'npx',
       args: [`@lpextend/mcp-server@${LP_MCP_VERSION}`],
