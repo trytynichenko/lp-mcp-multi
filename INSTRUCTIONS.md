@@ -64,7 +64,7 @@ When the user asks to work on a specific account:
 3. The last-used account is remembered across sessions (stored in `.last-account`)
 4. Always announce: "Connected to account <id> (<name>)"
 
-Examples: "delta prod", "morgan", "mm", "si", "90862799" all work as input.
+Examples: "acme prod", "dev", "test", "90862799" all work as input (IDs, names, and aliases).
 
 To see the current account: call `account_current`
 To list all accounts: call `account_list`
@@ -102,7 +102,7 @@ To list all accounts: call `account_list`
 ```
 
 **Optional fields:**
-- `aliases` — array of short names for quick switching (e.g. `["mm", "morgan"]`). Matched case-insensitively.
+- `aliases` — array of short names for quick switching (e.g. `["prod", "dev"]`). Matched case-insensitively.
 - `tools` — comma-separated LP tool groups to load for this account (e.g. `"core,cb,ai"`). Default: all groups. Groups: `core`, `extra`, `conv`, `kai`, `cb`, `ai`, `auth`, `demo`, `composite`, `web`.
 
 ### Adding a New Account
