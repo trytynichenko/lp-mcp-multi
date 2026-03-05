@@ -25,7 +25,7 @@ Proceed? (yes/no)
 
 ### Project Structure
 ```
-lp-claude-mcp/
+lp-mcp-multi/
   accounts.json         # All account credentials (git-ignored)
   .mcp.json             # MCP server config (multi-client)
   INSTRUCTIONS.md       # Agent instructions (tool-agnostic)

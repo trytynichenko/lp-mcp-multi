@@ -37,7 +37,7 @@ Everything else (62 LP tools) is proxied through unchanged.
 
 ```bash
 git clone <repo-url>
-cd lp-claude-mcp
+cd lp-mcp-multi
 cd mcp-proxy && npm install && cd ..
 ```
 
@@ -76,7 +76,7 @@ To get these credentials:
 #### Claude Code
 
 ```bash
-claude mcp add liveperson -- node /path/to/lp-claude-mcp/mcp-proxy/src/index.js
+claude mcp add liveperson -- node /path/to/lp-mcp-multi/mcp-proxy/src/index.js
 ```
 
 Or drop a `.mcp.json` in the project root (already included):
@@ -96,7 +96,7 @@ Or drop a `.mcp.json` in the project root (already included):
 
 Settings > MCP Servers > Add Server:
 - **Name:** liveperson
-- **Command:** `node /path/to/lp-claude-mcp/mcp-proxy/src/index.js`
+- **Command:** `node /path/to/lp-mcp-multi/mcp-proxy/src/index.js`
 
 #### VS Code + GitHub Copilot
 
@@ -107,7 +107,7 @@ Create `.vscode/mcp.json` in your project:
   "servers": {
     "liveperson": {
       "command": "node",
-      "args": ["/path/to/lp-claude-mcp/mcp-proxy/src/index.js"]
+      "args": ["/path/to/lp-mcp-multi/mcp-proxy/src/index.js"]
     }
   }
 }
@@ -120,7 +120,7 @@ Add to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.liveperson]
 command = "node"
-args = ["/path/to/lp-claude-mcp/mcp-proxy/src/index.js"]
+args = ["/path/to/lp-mcp-multi/mcp-proxy/src/index.js"]
 ```
 
 #### Gemini CLI
@@ -132,7 +132,7 @@ Add to your Gemini settings.json:
   "mcpServers": {
     "liveperson": {
       "command": "node",
-      "args": ["/path/to/lp-claude-mcp/mcp-proxy/src/index.js"]
+      "args": ["/path/to/lp-mcp-multi/mcp-proxy/src/index.js"]
     }
   }
 }
@@ -187,7 +187,7 @@ See the [LP MCP Server docs](https://storage.googleapis.com/lp-shared-content/lp
 ## Project structure
 
 ```
-lp-claude-mcp/
+lp-mcp-multi/
   accounts.json              # All account credentials (git-ignored)
   .mcp.json                  # MCP server config (for tools that read it)
   mcp-proxy/                 # Multi-account MCP proxy server
