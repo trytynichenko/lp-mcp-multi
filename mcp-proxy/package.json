@@ -1,0 +1,18 @@
+{
+  "name": "lp-mcp-multi",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Multi-account MCP proxy for LivePerson — wraps @lpextend/mcp-server with instant account switching and extra tools (FaaS, etc.)",
+  "main": "src/index.js",
+  "bin": {
+    "lp-mcp-multi": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": ["liveperson", "mcp", "model-context-protocol", "ai", "chatbot"],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}

@@ -1,0 +1,17 @@
+# Credentials — never commit
+accounts.json
+
+# Account artifacts — user-specific outputs
+accounts/*/artifacts/
+
+# Node
+node_modules/
+
+# Workflows — user-specific
+workflows/
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
