@@ -30,6 +30,8 @@ import * as faasTools from './tools/faas.js';
 import * as summaryTools from './tools/summary.js';
 import * as changelogTools from './tools/changelog.js';
 import * as campaignTraceTools from './tools/campaign-trace.js';
+import * as skillTraceTools from './tools/skill-trace.js';
+import * as convAnalyticsTools from './tools/conv-analytics.js';
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -48,7 +50,7 @@ const ctx = { accountManager, auth, lpChild, state };
 
 // ─── Register custom tools ──────────────────────────────────────────────────
 
-const toolModules = [accountTools, faasTools, summaryTools, changelogTools, campaignTraceTools];
+const toolModules = [accountTools, faasTools, summaryTools, changelogTools, campaignTraceTools, skillTraceTools, convAnalyticsTools];
 
 // Collect tool definitions
 const customToolDefs = toolModules.flatMap(m => m.tools);
@@ -82,6 +84,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'boolean',
               description: 'search: return compact results (strip message records, keep conversation info only)',
             },
+            source: {
+              type: 'string',
+              description: 'search: filter by channel source (e.g. "WhatsApp Business", "SMS", "WEB", "FACEBOOK"). Case-insensitive partial match.',
+            },
           },
         },
       };
@@ -113,11 +119,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // Strip proxy-only params before forwarding to LP child
   const lpArgs = { ...args };
   const compact = lpArgs.compact;
+  const source = lpArgs.source;
   delete lpArgs.compact;
+  delete lpArgs.source;
 
   try {
     const result = await lpChild.callTool(toolName, lpArgs);
-    return postProcess(toolName, lpArgs, result, { compact });
+    return postProcess(toolName, lpArgs, result, { compact, source });
   } catch (err) {
     // Auto-reconnect on child death
     if (state.accountId && (err.message?.includes('closed') || err.message?.includes('not connected'))) {
@@ -126,7 +134,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const account = accountManager.resolve(state.accountId);
         await lpChild.spawn(account);
         const result = await lpChild.callTool(toolName, lpArgs);
-        return postProcess(toolName, lpArgs, result, { compact });
+        return postProcess(toolName, lpArgs, result, { compact, source });
       } catch (retryErr) {
         return { content: [{ type: 'text', text: `Failed after reconnect: ${retryErr.message}` }], isError: true };
       }
@@ -142,37 +150,56 @@ function postProcess(toolName, args, result, opts) {
     const txt = result?.content?.[0]?.text;
     if (!txt) return result;
 
-    // R3: Compact mode for conv_manage search
-    if (toolName === 'conv_manage' && args.action === 'search' && opts.compact) {
+    // R3 + R6: Compact mode and/or source filter for conv_manage search
+    if (toolName === 'conv_manage' && args.action === 'search' && (opts.compact || opts.source)) {
       const data = JSON.parse(txt);
-      const records = data.conversationHistoryRecords || [];
-      const conversations = records.map(r => {
-        const i = r.info || {};
-        const cp = r.consumerParticipants?.[0] || {};
+      let records = data.conversationHistoryRecords || [];
+
+      // R6: Apply source filter
+      if (opts.source) {
+        const needle = opts.source.toLowerCase();
+        records = records.filter(r => (r.info?.source || '').toLowerCase().includes(needle));
+      }
+
+      // R3: Compact transformation
+      if (opts.compact) {
+        const conversations = records.map(r => {
+          const i = r.info || {};
+          const cp = r.consumerParticipants?.[0] || {};
+          return {
+            conversationId: i.conversationId,
+            source: i.source,
+            startTime: i.startTime,
+            endTime: i.endTime,
+            duration: i.duration,
+            status: i.status,
+            latestSkillId: i.latestSkillId,
+            latestSkillName: i.latestSkillName,
+            latestAgentFullName: i.latestAgentFullName,
+            latestAgentGroupName: i.latestAgentGroupName,
+            closeReason: i.closeReasonDescription,
+            mcs: i.mcs,
+            firstConversation: i.firstConversation,
+            consumerName: cp.firstName ? `${cp.firstName} ${cp.lastName || ''}`.trim() : undefined,
+            campaign: r.campaign,
+          };
+        });
         return {
-          conversationId: i.conversationId,
-          source: i.source,
-          startTime: i.startTime,
-          endTime: i.endTime,
-          duration: i.duration,
-          status: i.status,
-          latestSkillId: i.latestSkillId,
-          latestSkillName: i.latestSkillName,
-          latestAgentFullName: i.latestAgentFullName,
-          latestAgentGroupName: i.latestAgentGroupName,
-          closeReason: i.closeReasonDescription,
-          mcs: i.mcs,
-          firstConversation: i.firstConversation,
-          consumerName: cp.firstName ? `${cp.firstName} ${cp.lastName || ''}`.trim() : undefined,
-          campaign: r.campaign,
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              count: conversations.length,
+              ...(opts.source && { totalBeforeFilter: data._metadata?.count }),
+              conversations,
+            }, null, 2),
+          }],
         };
-      });
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ count: data._metadata?.count || conversations.length, conversations }, null, 2),
-        }],
-      };
+      }
+
+      // Source filter only (no compact) — return filtered full records
+      data.conversationHistoryRecords = records;
+      if (opts.source) data._filtered = { source: opts.source, matched: records.length, total: data._metadata?.count };
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
     }
 
     // R4: Enrich ac_engagements get with extracted phones/URLs from HTML

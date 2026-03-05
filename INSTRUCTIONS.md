@@ -206,10 +206,13 @@ Gather comprehensive account data:
 - `ac_campaigns: list_summary` / `get`: Campaign details
 - `ac_engagements: list` / `get`: Engagement config (get auto-extracts phone numbers and URLs from HTML as `_extractedPhones` / `_extractedUrls`)
 - `composite_campaign_trace`: Trace the full routing chain for a channel, skill, or campaign — returns connector → campaign → engagement (with phones/URLs) → entry point (with URL patterns) → skill. Use `channel` (whatsapp, sms, facebook, etc.), `skill`, or `campaignId` as filter.
+- `composite_skill_trace`: Show everything connected to a skill — campaigns/engagements routing to it, bot and human agents assigned. Use `skill` (name or ID, partial match).
+- `composite_skill_map`: Full skill → assignment/routing matrix. Shows which skills have bots, humans, campaign routing. Flags orphaned/unassigned skills. Optional `filter`: `orphaned`, `unassigned`, `bots-only`.
 - `composite_cleanup_campaigns`: Find stale campaigns (dry-run is read-only, delete needs confirmation)
 
 ### Conversation Management
-- `conv_manage: search`: Find conversations (default: OPEN, last 24h). Add `compact: true` for lightweight results (strips message records, keeps conversation info only — source, skill, status, duration, MCS, campaign).
+- `conv_manage: search`: Find conversations (default: OPEN, last 24h). Add `compact: true` for lightweight results (strips message records, keeps conversation info only). Add `source` to filter by channel (e.g. "WhatsApp Business", "SMS", "WEB"). Both can be combined.
+- `conv_analytics`: Aggregated conversation statistics — group by `source`, `skill`, `agentGroup`, `day`, or `hour`. Returns counts, avg duration, MCS distribution. Defaults to closed conversations from last 7 days.
 - `conv_manage: get_transcript`: Read conversation history
 - Close/transfer/message: WRITE — needs confirmation
 
@@ -222,6 +225,7 @@ Gather comprehensive account data:
 - `faas_functions: get`: Full function with source code
 - `faas_functions: pull_all`: Export all functions to `artifacts/faas/`
 - `faas_functions: diff`: Compare a local export against the live version (requires prior `pull_all`)
+- `faas_functions: diff_all`: Compare ALL local exports against live — shows changed, new, and deleted functions in one call (requires prior `pull_all`)
 
 ### Changelog
 - `changelog_log`: Append an entry after any write operation (action + details)

@@ -15,16 +15,17 @@ export const tools = [
     name: 'faas_functions',
     description:
       'Manage LivePerson Functions (FaaS): list, get (with source code), pull_all (export all to artifacts/faas/), ' +
-      'or diff (compare local export against live version).',
+      'diff (compare one local export against live), or diff_all (compare all local exports against live).',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['list', 'get', 'pull_all', 'diff'],
+          enum: ['list', 'get', 'pull_all', 'diff', 'diff_all'],
           description:
             'list: summary of all functions. get: full function with code. ' +
-            'pull_all: export all to artifacts/faas/. diff: compare local vs live (requires prior pull_all).',
+            'pull_all: export all to artifacts/faas/. diff: compare one local vs live. ' +
+            'diff_all: compare all local exports vs live (requires prior pull_all).',
         },
         name: { type: 'string', description: 'get/diff: function name (exact match)' },
         uuid: { type: 'string', description: 'get: function UUID (alternative to name)' },
@@ -171,6 +172,77 @@ export function register(ctx) {
             return text(`${args.name}: no changes (local matches live)`);
           }
           return text(`${args.name}: ${diffs.length} difference(s)\n\n${diffs.join('\n')}`);
+        }
+
+        case 'diff_all': {
+          const faasDir = accountManager.ensureArtifactsDir(state.accountId, 'faas');
+          const lambdas = await faasGet('/lambdas');
+          const liveNames = new Set(lambdas.map(fn => fn.name));
+          const results = [];
+
+          // Compare each live function against local export (parallel)
+          const comparisons = await Promise.all(lambdas.map(async (fn) => {
+            const fnDir = join(faasDir, fn.name);
+            const localCodePath = join(fnDir, 'index.js');
+
+            if (!existsSync(localCodePath)) {
+              return { name: fn.name, status: 'new', note: 'no local export' };
+            }
+
+            const full = await faasGet('/lambdas', `&name=${encodeURIComponent(fn.name)}`);
+            const detail = full?.[0];
+            if (!detail) return { name: fn.name, status: 'error', note: 'could not fetch live version' };
+
+            const diffs = [];
+            const liveCode = detail.implementation?.code || '';
+            const localCode = readFileSync(localCodePath, 'utf-8');
+            if (localCode.trim() !== liveCode.trim()) diffs.push('code');
+
+            const localConfigPath = join(fnDir, 'config.json');
+            if (existsSync(localConfigPath)) {
+              const lc = JSON.parse(readFileSync(localConfigPath, 'utf-8'));
+              if (JSON.stringify(detail.implementation?.environmentVariables || []) !== JSON.stringify(lc.environmentVariables || [])) diffs.push('env vars');
+              if ((detail.state || '') !== (lc.state || '')) diffs.push(`state: ${lc.state} → ${detail.state}`);
+              if (JSON.stringify(detail.implementation?.dependencies || []) !== JSON.stringify(lc.dependencies || [])) diffs.push('dependencies');
+            }
+
+            return {
+              name: fn.name,
+              status: diffs.length ? 'changed' : 'unchanged',
+              ...(diffs.length && { changes: diffs }),
+            };
+          }));
+          results.push(...comparisons);
+
+          // Check for locally-exported functions deleted from live
+          const { readdirSync } = await import('fs');
+          try {
+            const localDirs = readdirSync(faasDir, { withFileTypes: true })
+              .filter(d => d.isDirectory())
+              .map(d => d.name);
+            for (const dir of localDirs) {
+              if (!liveNames.has(dir) && existsSync(join(faasDir, dir, 'index.js'))) {
+                results.push({ name: dir, status: 'deleted', note: 'exists locally but not on live' });
+              }
+            }
+          } catch { /* faas dir might not exist */ }
+
+          const changed = results.filter(r => r.status === 'changed');
+          const newFns = results.filter(r => r.status === 'new');
+          const deleted = results.filter(r => r.status === 'deleted');
+          const unchanged = results.filter(r => r.status === 'unchanged');
+
+          return text(JSON.stringify({
+            summary: {
+              total: results.length,
+              changed: changed.length,
+              new: newFns.length,
+              deleted: deleted.length,
+              unchanged: unchanged.length,
+            },
+            functions: results.filter(r => r.status !== 'unchanged'),
+            ...(unchanged.length && { unchangedFunctions: unchanged.map(r => r.name) }),
+          }, null, 2));
         }
 
         default:
