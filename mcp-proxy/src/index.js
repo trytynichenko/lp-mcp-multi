@@ -32,6 +32,7 @@ import * as changelogTools from './tools/changelog.js';
 import * as campaignTraceTools from './tools/campaign-trace.js';
 import * as skillTraceTools from './tools/skill-trace.js';
 import * as convAnalyticsTools from './tools/conv-analytics.js';
+import * as convSimulateTools from './tools/conv-simulate.js';
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ const ctx = { accountManager, auth, lpChild, state };
 
 // ─── Register custom tools ──────────────────────────────────────────────────
 
-const toolModules = [accountTools, faasTools, summaryTools, changelogTools, campaignTraceTools, skillTraceTools, convAnalyticsTools];
+const toolModules = [accountTools, faasTools, summaryTools, changelogTools, campaignTraceTools, skillTraceTools, convAnalyticsTools, convSimulateTools];
 
 // Collect tool definitions
 const customToolDefs = toolModules.flatMap(m => m.tools);

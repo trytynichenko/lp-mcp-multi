@@ -15,14 +15,15 @@ This proxy wraps it and adds:
 - **Account summary** — single-call snapshot of the entire account (skills, bots, flows, KBs, campaigns, apps, FaaS, conversations)
 - **Per-account artifacts** — organized storage for audits, exports, and deliverables
 
-Everything else (62 LP tools) is proxied through unchanged.
+Everything else (111 LP tools) is proxied through unchanged.
 
 ## What it does
 
-- **67 tools** — 62 from the LP MCP server + 5 custom (account management, FaaS, account summary)
+- **120 tools** — 111 from the LP MCP server + 9 custom (account management, FaaS, summary, changelog, analytics, conversation simulator)
 - **Instant account switching** — switch between accounts in seconds, no restart needed
 - **Multi-account** — all credentials in one `accounts.json`, switch between them on the fly
-- **FaaS management** — list, read source code, and export all LivePerson Functions
+- **FaaS management** — list, read source code, diff, and export all LivePerson Functions
+- **Conversation simulator** — create conversations as a consumer, interact with bots, test routing
 - **Per-account artifacts** — audits, backups, exports stored in `accounts/<id>/artifacts/`
 
 ## Quick start
@@ -177,9 +178,34 @@ Open your AI tool in the project directory and start talking:
 |---|---|
 | `account_summary` | Single-call snapshot of the entire account: skills, LOBs, users, bots, AI Studio flows, knowledge bases, campaigns, installed apps, FaaS functions, and open conversations. Pass `sections` to limit (e.g. `"skills,bots,flows"`). |
 
-### Proxied LP tools (62)
+### Changelog
 
-All tools from `@lpextend/mcp-server` v0.10.4 are proxied through:
+| Tool | Description |
+|---|---|
+| `changelog_log` | Append an entry after any write operation (action + details) |
+| `changelog_view` | View recent changelog entries (default last 20) |
+
+### Conversation analytics
+
+| Tool | Description |
+|---|---|
+| `conv_analytics` | Aggregated conversation statistics — group by `source`, `skill`, `agentGroup`, `day`, or `hour`. Returns counts, avg duration, MCS distribution. |
+
+### Conversation simulator
+
+| Tool | Action | Description |
+|---|---|---|
+| `conv_simulate` | `create` | Open a new conversation as consumer, optionally send initial message |
+| `conv_simulate` | `send` | Send a consumer message (supports `wait` for bot response) |
+| `conv_simulate` | `close` | Close a conversation from consumer side |
+| `conv_simulate` | `list` | Show all conversations created in this session |
+| `conv_simulate` | `history` | Retrieve messages from a conversation |
+
+Uses the Messaging REST API with AppJWT + ConsumerJWS auth. Auto-discovers a suitable app installation (`msg.consumer` scope). Supports custom consumer identity, rich content, campaign attribution, and bot response polling.
+
+### Proxied LP tools (111)
+
+All tools from `@lpextend/mcp-server` are proxied through:
 Conversation Builder, AI Studio, Knowledge AI, Campaigns, Account Config, Conversations, Auth, Composites, Demo Wizard, and Web Crawl.
 
 See the [LP MCP Server docs](https://storage.googleapis.com/lp-shared-content/lp-extend-mcp/lp-extend-mcp.html) for the full tool catalog.
@@ -198,8 +224,13 @@ lp-mcp-multi/
       lp-child.js             # LP MCP child process lifecycle
       tools/
         account.js            # account_switch, account_list, account_current
-        faas.js               # faas_functions (list, get, pull_all)
+        faas.js               # faas_functions (list, get, pull_all, diff, diff_all)
         summary.js            # account_summary (full account snapshot)
+        changelog.js          # changelog_log, changelog_view
+        campaign-trace.js     # composite_campaign_trace (via proxy enrichment)
+        skill-trace.js        # composite_skill_trace (via proxy enrichment)
+        conv-analytics.js     # conv_analytics (aggregated stats)
+        conv-simulate.js      # conv_simulate (consumer-side messaging)
     package.json
   accounts/
     <account_id>/

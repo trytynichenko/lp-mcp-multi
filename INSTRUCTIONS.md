@@ -39,9 +39,13 @@ lp-mcp-multi/
       lp-child.js       # LP MCP child process lifecycle (LP_TOOLS filtering)
       tools/
         account.js      # account_switch, account_list, account_current
-        faas.js         # faas_functions (list, get, pull_all, diff)
+        faas.js         # faas_functions (list, get, pull_all, diff, diff_all)
         summary.js      # account_summary (full account snapshot)
         changelog.js    # changelog_log, changelog_view (local audit log)
+        campaign-trace.js   # composite_campaign_trace enrichment
+        skill-trace.js      # composite_skill_trace enrichment
+        conv-analytics.js   # conv_analytics (aggregated stats)
+        conv-simulate.js    # conv_simulate (consumer-side messaging)
     package.json
   accounts/
     <account_id>/
@@ -153,6 +157,7 @@ The user must:
 
 ### Conversations (writes)
 - `conv_manage`: close, close_all, transfer, send_message
+- `conv_simulate`: create, send, close (consumer-side messaging)
 
 ### Auth (writes)
 - `auth_apps`: install, update, delete
@@ -215,6 +220,15 @@ Gather comprehensive account data:
 - `conv_analytics`: Aggregated conversation statistics — group by `source`, `skill`, `agentGroup`, `day`, or `hour`. Returns counts, avg duration, MCS distribution. Defaults to closed conversations from last 7 days.
 - `conv_manage: get_transcript`: Read conversation history
 - Close/transfer/message: WRITE — needs confirmation
+
+### Consumer Conversation Simulator
+- `conv_simulate: create`: Open a new conversation as a consumer, targeting a specific skill. Supports initial message, custom consumer name/ID, and campaign attribution.
+- `conv_simulate: send`: Send a consumer message. Use `wait: true` to poll for bot/agent response (up to 15s). Supports rich content (LP structured content JSON).
+- `conv_simulate: close`: Close a conversation from consumer side.
+- `conv_simulate: list`: Show all conversations created by the simulator in this session.
+- `conv_simulate: history`: Retrieve full message history from a conversation.
+- Auto-discovers app installations with `msg.consumer` scope. When multiple exist, presents a selection. Caches tokens (AppJWT 1h, ConsumerJWS permanent, CSDS 30min).
+- **All actions are WRITE operations** — create/send/close modify conversation state.
 
 ### Account Backup
 - `composite_backup_account`: Full config snapshot (read-only)
