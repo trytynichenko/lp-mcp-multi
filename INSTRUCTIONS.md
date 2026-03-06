@@ -96,7 +96,7 @@ To list all accounts: call `account_list`
 **OAuth 2.0 accounts** — set `appKey` to the client ID, `secret` to the client secret, and use `"hint"` for both `accessToken` and `accessTokenSecret`:
 ```json
 {
-  "24831960": {
+  "12345678": {
     "name": "My Account",
     "login": "bot_login_name",
     "appKey": "<client_id>",
