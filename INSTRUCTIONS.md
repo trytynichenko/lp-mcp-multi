@@ -84,7 +84,9 @@ To list all accounts: call `account_list`
     "accessToken": "...",
     "accessTokenSecret": "...",
     "aliases": ["short", "alias"],
-    "tools": "core,cb,ai,kai"
+    "tools": "core,cb,ai,kai",
+    "connectorAppId": "optional-app-client-id",
+    "connectorSecret": "optional-app-client-secret"
   }
 }
 ```
@@ -108,6 +110,7 @@ To list all accounts: call `account_list`
 **Optional fields:**
 - `aliases` — array of short names for quick switching (e.g. `["prod", "dev"]`). Matched case-insensitively.
 - `tools` — comma-separated LP tool groups to load for this account (e.g. `"core,cb,ai"`). Default: all groups. Groups: `core`, `extra`, `conv`, `kai`, `cb`, `ai`, `auth`, `demo`, `composite`, `web`.
+- `connectorAppId` / `connectorSecret` — app installation credentials for `conv_simulate`. If omitted, auto-discovered from installed apps with `msg.consumer` scope.
 
 ### Adding a New Account
 The user must:

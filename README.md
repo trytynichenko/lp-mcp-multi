@@ -67,7 +67,12 @@ Create `accounts.json` in the project root:
 }
 ```
 
-To get these credentials:
+**Optional fields:**
+- `aliases` — array of short names for quick switching (e.g. `["prod", "dev"]`)
+- `tools` — comma-separated LP tool groups to load (e.g. `"core,cb,ai"`)
+- `connectorAppId` / `connectorSecret` — app installation credentials for `conv_simulate` (if omitted, auto-discovered from installed apps with `msg.consumer` scope)
+
+To get the base credentials:
 1. Log in to Conversational Cloud
 2. Go to **Users** > **Add user** > set type to **Bot** > assign **Administrator** profile
 3. Generate API keys on the bot user's profile page
