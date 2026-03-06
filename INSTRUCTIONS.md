@@ -1,6 +1,6 @@
 # LP Multi-Account MCP Server
 
-A multi-account MCP server for LivePerson Solution Architects. Wraps `@lpextend/mcp-server` and adds instant account switching, FaaS function management, and per-account artifact storage. Helps with daily routine tasks across multiple LP accounts: auditing, scoping, debugging, configuration changes, and document generation.
+A multi-account MCP server for LivePerson Solution Architects. Wraps `@lpextend/mcp-server` and adds instant account switching, FaaS management, conversation analytics, consumer conversation simulator, campaign/skill tracing, changelog, and per-account artifact storage. Helps with daily routine tasks across multiple LP accounts: auditing, scoping, debugging, testing, configuration changes, and document generation.
 
 ## Safety First — Production Account Access
 
@@ -42,8 +42,8 @@ lp-mcp-multi/
         faas.js         # faas_functions (list, get, pull_all, diff, diff_all)
         summary.js      # account_summary (full account snapshot)
         changelog.js    # changelog_log, changelog_view (local audit log)
-        campaign-trace.js   # composite_campaign_trace enrichment
-        skill-trace.js      # composite_skill_trace enrichment
+        campaign-trace.js   # composite_campaign_trace (routing chain trace)
+        skill-trace.js      # composite_skill_trace, composite_skill_map
         conv-analytics.js   # conv_analytics (aggregated stats)
         conv-simulate.js    # conv_simulate (consumer-side messaging)
     package.json
@@ -231,7 +231,7 @@ Gather comprehensive account data:
 - `conv_simulate: list`: Show all conversations created by the simulator in this session.
 - `conv_simulate: history`: Retrieve full message history from a conversation.
 - Auto-discovers app installations with `msg.consumer` scope. When multiple exist, presents a selection. Caches tokens (AppJWT 1h, ConsumerJWS permanent, CSDS 30min).
-- **All actions are WRITE operations** — create/send/close modify conversation state.
+- `list` and `history` are read-only. `create`, `send`, `close` are **WRITE operations** — need confirmation.
 
 ### Account Backup
 - `composite_backup_account`: Full config snapshot (read-only)

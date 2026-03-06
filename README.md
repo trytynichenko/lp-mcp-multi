@@ -1,6 +1,6 @@
 # LP Multi-Account MCP Server
 
-A multi-account MCP server for LivePerson Solution Architects. Wraps [`@lpextend/mcp-server`](https://www.npmjs.com/package/@lpextend/mcp-server) and adds instant account switching, FaaS function management, and per-account artifact storage.
+A multi-account MCP server for LivePerson Solution Architects. Wraps [`@lpextend/mcp-server`](https://www.npmjs.com/package/@lpextend/mcp-server) and adds instant account switching, FaaS management, conversation analytics, consumer conversation simulator, campaign/skill tracing, and per-account artifact storage.
 
 Works with **Claude Code, Cursor, VS Code Copilot, OpenAI Codex, Gemini CLI, Windsurf**, and any MCP-compatible client.
 
@@ -11,18 +11,24 @@ The official [`@lpextend/mcp-server`](https://www.npmjs.com/package/@lpextend/mc
 This proxy wraps it and adds:
 
 - **Instant account switching** — all credentials in one file, switch mid-conversation with no restart
-- **FaaS management** — list functions, read source code, bulk export — not available in the original
-- **Account summary** — single-call snapshot of the entire account (skills, bots, flows, KBs, campaigns, apps, FaaS, conversations)
+- **FaaS management** — list, read source code, diff, bulk export — not available in the original
+- **Account summary** — single-call snapshot of the entire account (skills, bots, flows, KBs, campaigns, channels, apps, FaaS, conversations)
+- **Campaign & skill tracing** — trace routing chains end-to-end, map skill assignments, find orphaned resources
+- **Conversation analytics** — aggregated stats by source, skill, agent group, day, or hour
+- **Consumer conversation simulator** — create conversations as a consumer, send messages, test bot flows
+- **Changelog** — local audit log of all write operations per account
 - **Per-account artifacts** — organized storage for audits, exports, and deliverables
 
 Everything else (111 LP tools) is proxied through unchanged.
 
 ## What it does
 
-- **120 tools** — 111 from the LP MCP server + 9 custom (account management, FaaS, summary, changelog, analytics, conversation simulator)
+- **123 tools** — 111 from the LP MCP server + 12 custom
 - **Instant account switching** — switch between accounts in seconds, no restart needed
 - **Multi-account** — all credentials in one `accounts.json`, switch between them on the fly
 - **FaaS management** — list, read source code, diff, and export all LivePerson Functions
+- **Campaign & skill tracing** — trace routing chains, map skill assignments, find orphaned skills
+- **Conversation analytics** — aggregated stats grouped by source, skill, agent group, time
 - **Conversation simulator** — create conversations as a consumer, interact with bots, test routing
 - **Per-account artifacts** — audits, backups, exports stored in `accounts/<id>/artifacts/`
 
@@ -157,6 +163,9 @@ Open your AI tool in the project directory and start talking:
 "Switch to Beta Inc and list their bots"
 "Pull all FaaS functions from this account"
 "Run a full audit of the campaign stack"
+"Trace the WhatsApp routing chain"
+"Show conversation analytics for the last 7 days grouped by skill"
+"Create a test conversation on the support skill and talk to the bot"
 ```
 
 ## Custom tools
@@ -176,12 +185,22 @@ Open your AI tool in the project directory and start talking:
 | `faas_functions` | `list` | Summary of all functions (name, state, event, uuid) |
 | `faas_functions` | `get` | Full function details + source code (by name or uuid) |
 | `faas_functions` | `pull_all` | Export all functions to `accounts/<id>/artifacts/faas/` |
+| `faas_functions` | `diff` | Compare a local export against the live version |
+| `faas_functions` | `diff_all` | Compare ALL local exports against live — shows changed, new, deleted |
 
 ### Account summary
 
 | Tool | Description |
 |---|---|
-| `account_summary` | Single-call snapshot of the entire account: skills, LOBs, users, bots, AI Studio flows, knowledge bases, campaigns, installed apps, FaaS functions, and open conversations. Pass `sections` to limit (e.g. `"skills,bots,flows"`). |
+| `account_summary` | Single-call snapshot of the entire account: skills, LOBs, users, bots, AI Studio flows, knowledge bases, campaigns, channels (messaging connectors), installed apps, FaaS functions, and open conversations. Pass `sections` to limit (e.g. `"skills,bots,flows"`). |
+
+### Campaign & skill tracing
+
+| Tool | Description |
+|---|---|
+| `composite_campaign_trace` | Trace the full routing chain: connector → campaign → engagement (with phones/URLs) → entry point → skill. Filter by `channel`, `skill`, or `campaignId`. |
+| `composite_skill_trace` | Show everything connected to a skill — campaigns, engagements, bot and human agents. Filter by skill name or ID (partial match). |
+| `composite_skill_map` | Full skill → assignment/routing matrix. Flags orphaned/unassigned skills. Optional `filter`: `orphaned`, `unassigned`, `bots-only`. |
 
 ### Changelog
 
@@ -232,8 +251,8 @@ lp-mcp-multi/
         faas.js               # faas_functions (list, get, pull_all, diff, diff_all)
         summary.js            # account_summary (full account snapshot)
         changelog.js          # changelog_log, changelog_view
-        campaign-trace.js     # composite_campaign_trace (via proxy enrichment)
-        skill-trace.js        # composite_skill_trace (via proxy enrichment)
+        campaign-trace.js     # composite_campaign_trace (routing chain trace)
+        skill-trace.js        # composite_skill_trace, composite_skill_map
         conv-analytics.js     # conv_analytics (aggregated stats)
         conv-simulate.js      # conv_simulate (consumer-side messaging)
     package.json
